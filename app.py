@@ -1,24 +1,18 @@
 import streamlit as st
-import matplotlib.pyplot as plt
-from mplsoccer import Pitch
 import pandas as pd
+import matplotlib.pyplot as plt
+from mplsoccer import VerticalPitch
 from streamlit_image_coordinates import streamlit_image_coordinates
 from io import BytesIO
 import numpy as np
-from PIL import Image
-from matplotlib.lines import Line2D
+
+st.set_page_config(layout="wide")
+st.title("Shot Map with Video")
 
 # ==========================
-# Page Configuration
+# 1. RAW DATA
 # ==========================
-st.set_page_config(layout="wide", page_title="Shot Map Analysis")
 
-st.title("Shot Map Analysis")
-st.caption("Click on the icons on the pitch to play the corresponding shot video.")
-
-# ==========================
-# Data Setup (Updated with your coordinates)
-# ==========================
 shots_raw = [
     ("ON TARGET", 93.08, 43.99, "videos/Fin 1.mp4"),
     ("GOAL", 101.06, 37.84, "videos/Fin 2.mp4"),
@@ -29,86 +23,104 @@ shots_raw = [
     ("ON TARGET", 109.37, 45.15, "videos/Fin 7.mp4"),
 ]
 
-df = pd.DataFrame(shots_raw, columns=["type", "x", "y", "video"])
-
-def get_style(outcome):
-    if outcome == "GOAL":
-        return '*', '#EF476F', 250  # Pink Star
-    if outcome == "ON TARGET":
-        return 'h', '#06D6A0', 180  # Green Hexagon
-    return 'o', '#FFD166', 150      # Yellow Circle
+df = pd.DataFrame(shots_raw, columns=["result", "x", "y", "video"])
 
 # ==========================
-# Main Layout
+# 2. SPLIT TYPES
 # ==========================
-col_map, col_vid = st.columns([1, 1])
 
-with col_map:
-    st.subheader("Interactive Half-Pitch Map")
-    
-    # Pitch Setup: Added half=True and maintained Black background
-    pitch = Pitch(half=True, pitch_type='statsbomb', pitch_color='#1a1a1a', line_color='#c2c2c2')
-    fig, ax = pitch.draw(figsize=(8, 6))
-    
-    for _, row in df.iterrows():
-        marker, color, size = get_style(row["type"])
-        pitch.scatter(row.x, row.y, marker=marker, s=size, color=color, 
-                      edgecolors='white', linewidths=1.0, ax=ax, zorder=3)
-
-    # Legend
-    legend_elements = [
-        Line2D([0], [0], marker='*', color='w', label='Goal', markerfacecolor='#EF476F', markersize=12, linestyle='None'),
-        Line2D([0], [0], marker='h', color='w', label='On Target', markerfacecolor='#06D6A0', markersize=10, linestyle='None'),
-        Line2D([0], [0], marker='o', color='w', label='Off Target', markerfacecolor='#FFD166', markersize=10, linestyle='None'),
-    ]
-    ax.legend(handles=legend_elements, loc='upper left', frameon=True, fontsize='small')
-
-    # Convert plot to image for coordinate tracking
-    buf = BytesIO()
-    plt.savefig(buf, format="png", dpi=100, bbox_inches='tight', facecolor='#1a1a1a')
-    buf.seek(0)
-    img_obj = Image.open(buf)
-    
-    # Click interaction
-    click = streamlit_image_coordinates(img_obj, width=700)
+goal = df[df["result"] == "GOAL"]
+on_target = df[df["result"] == "ON TARGET"]
+off_target = df[df["result"] == "OFF TARGET"]
 
 # ==========================
-# Interaction Logic
+# 3. CREATE PITCH
 # ==========================
-selected_event = None
 
-if click is not None:
-    real_w, real_h = img_obj.size
-    disp_w, disp_h = click["width"], click["height"]
-    
-    pixel_x = click["x"] * (real_w / disp_w)
-    pixel_y = click["y"] * (real_h / disp_h)
-    
-    mpl_pixel_y = real_h - pixel_y
-    coords = ax.transData.inverted().transform((pixel_x, mpl_pixel_y))
-    field_x, field_y = coords[0], coords[1]
+pitch = VerticalPitch(
+    half=True,
+    pitch_type='statsbomb',
+    pitch_color='grass',
+    line_color='white'
+)
 
-    df["dist"] = np.sqrt((df["x"] - field_x)**2 + (df["y"] - field_y)**2)
-    
-    # Radius threshold
-    RADIUS = 4 
-    candidates = df[df["dist"] < RADIUS]
+fig, ax = pitch.draw(figsize=(6, 8))
 
-    if not candidates.empty:
-        selected_event = candidates.loc[candidates["dist"].idxmin()]
+SIZE = 320
+
+pitch.scatter(goal.x, goal.y, s=SIZE, marker='*',
+              c='#EF476F', edgecolors='#1f1f1f',
+              linewidth=1.2, ax=ax, label='Goal')
+
+pitch.scatter(on_target.x, on_target.y, s=SIZE, marker='h',
+              c='#06D6A0', edgecolors='#1f1f1f',
+              linewidth=1.2, ax=ax, label='On Target')
+
+pitch.scatter(off_target.x, off_target.y, s=SIZE, marker='o',
+              c='#FFD166', edgecolors='#1f1f1f',
+              linewidth=1.2, ax=ax, label='Off Target')
+
+legend = ax.legend(
+    loc='upper left',
+    bbox_to_anchor=(0.02, 0.98),
+    frameon=True,
+    fontsize=10,
+    title="Shots"
+)
 
 # ==========================
-# Video Display
+# 4. CONVERT FIG TO IMAGE
 # ==========================
-with col_vid:
-    st.subheader("Video Analysis")
-    if selected_event is not None:
-        st.success(f"**Outcome:** {selected_event['type']}")
-        
-        if selected_event["video"]:
-            try:
-                st.video(selected_event["video"])
-            except:
-                st.error(f"Video file not found: {selected_event['video']}")
+
+buf = BytesIO()
+plt.savefig(buf, format="png", dpi=200, bbox_inches="tight")
+buf.seek(0)
+
+# ==========================
+# 5. LAYOUT
+# ==========================
+
+col1, col2 = st.columns([1, 1])
+
+with col1:
+    st.subheader("Shot Map")
+
+    value = streamlit_image_coordinates(buf)
+
+# ==========================
+# 6. CLICK DETECTION
+# ==========================
+
+selected_video = None
+
+if value is not None:
+    click_x = value["x"]
+    click_y = value["y"]
+
+    # Normalize click (image -> pitch scale)
+    img_w, img_h = value["width"], value["height"]
+
+    # Convert to pitch coordinates (approximation)
+    pitch_x = (click_x / img_w) * 120
+    pitch_y = (click_y / img_h) * 80
+
+    # Find closest shot
+    df["distance"] = np.sqrt((df["x"] - pitch_x)**2 + (df["y"] - pitch_y)**2)
+
+    closest = df.loc[df["distance"].idxmin()]
+
+    # Threshold (important to avoid random clicks)
+    if closest["distance"] < 8:
+        selected_video = closest["video"]
+
+# ==========================
+# 7. VIDEO DISPLAY
+# ==========================
+
+with col2:
+    st.subheader("Video")
+
+    if selected_video:
+        st.video(selected_video)
     else:
-        st.info("Select a marker on the half-pitch to load the video analysis.")
+        st.info("Click on a shot to view the video.")
