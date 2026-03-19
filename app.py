@@ -6,145 +6,182 @@ from streamlit_image_coordinates import streamlit_image_coordinates
 from io import BytesIO
 from PIL import Image
 import numpy as np
+from matplotlib.lines import Line2D
 
+# ==========================
 # Page Configuration
+# ==========================
 st.set_page_config(layout="wide", page_title="Interactive Shot Map")
 
 st.title("⚽ Interactive Shot Map")
-st.caption("Click on any marker on the pitch to analyze the shot details and view footage.")
+st.caption("Markers with a **thick black border** contain video footage. Click them to play.")
 
 # ==========================
 # 1. DATA SETUP
 # ==========================
 @st.cache_data
 def get_data():
-    # Converted labels to English: "Gol" -> "Goal", "No Alvo" -> "On Target", "Fora" -> "Off Target"
     data = {
         "x": [93.08, 101.06, 97.24, 105.38, 111.70, 95.24, 109.37],
         "y": [43.99, 37.84, 54.46, 49.64, 41.83, 49.64, 45.15],
         "outcome": ["On Target", "Goal", "Off Target", "Off Target", "Off Target", "On Target", "On Target"],
-        # Example video link for the goal
-        "video": ["videos/Fin 1.mp4", "videos/Fin 2.mp4", "videos/Fin 3.mp4", "videos/Fin 4.mp4", "videos/Fin 5.mp4", "videos/Fin 6.mp4", "videos/Fin 7.mp4"]
+        # Lista de vídeos (alguns como None para testar a transparência)
+        "video": ["videos/Fin 1.mp4", "videos/Fin 2.mp4", None, "videos/Fin 4.mp4", None, "videos/Fin 6.mp4", "videos/Fin 7.mp4"]
     }
     return pd.DataFrame(data)
 
 df_shots = get_data()
 
-# ==========================
-# 2. STYLE LOGIC
-# ==========================
-def get_shot_style(outcome):
-    if outcome == "Goal":
-        return '*', '#EF476F', 500  # Star
-    elif outcome == "On Target":
-        return 'h', '#06D6A0', 380  # Hexagon
-    else:
-        return 'o', '#FFD166', 320  # Circle
+# Helper para estatísticas por zona
+# No VerticalPitch (Statsbomb), o Y lateral vai de 0-80. Central é ~20-60.
+df_shots["zone"] = df_shots["y"].apply(lambda y: "CENTRAL" if 20 < y <= 60 else "SIDE")
 
 # ==========================
-# 3. MAIN LAYOUT
+# 2. MAIN LAYOUT
 # ==========================
-col1, col2 = st.columns([1.3, 1])
+col_map, col_vid = st.columns([1.2, 1])
 
-with col1:
+with col_map:
     # Setup the Pitch
     pitch = VerticalPitch(
         half=True,
         pitch_type='statsbomb',
-        pitch_color='#1a1a1a', # Dark theme for modern look
-        line_color='#c2c2c2'
+        pitch_color='#f8f8f8',
+        line_color='#4a4a4a'
     )
     fig, ax = pitch.draw(figsize=(10, 8))
 
     # Plot each shot
     for _, row in df_shots.iterrows():
-        marker, color, size = get_shot_style(row["outcome"])
+        # Definir estilo baseado no outcome
+        if row["outcome"] == "Goal":
+            marker, base_color, base_size = '*', '#EF476F', 500
+        elif row["outcome"] == "On Target":
+            marker, base_color, base_size = 'h', '#06D6A0', 380
+        else:
+            marker, base_color, base_size = 'o', '#FFD166', 320
+        
+        has_vid = row["video"] is not None
+        
+        # Lógica de transparência e borda (Igual ao mapa de duelos)
+        if has_vid:
+            alpha, lw, ec = 1.0, 3.0, 'black'
+            z = 4
+        else:
+            alpha, lw, ec = 0.2, 1.0, base_color # Fica "fantasmagórico"
+            z = 2
+
         pitch.scatter(
             row.x, row.y,
-            s=size,
+            s=base_size,
             marker=marker,
-            c=color,
-            edgecolors='white',
-            linewidth=1.2,
+            facecolors=base_color,
+            alpha=alpha,
+            edgecolors=ec,
+            linewidths=lw,
             ax=ax,
-            zorder=3
+            zorder=z
         )
 
-    # Convert plot to image to enable coordinates tracking
+    # Legenda Customizada
+    legend_elements = [
+        Line2D([0], [0], marker='*', color='w', label='Goal', markerfacecolor='#EF476F', markersize=12),
+        Line2D([0], [0], marker='h', color='w', label='On Target', markerfacecolor='#06D6A0', markersize=10),
+        Line2D([0], [0], marker='o', color='w', label='Off Target', markerfacecolor='#FFD166', markersize=10),
+        Line2D([0], [0], marker='o', color='w', label='With Video', markerfacecolor='none', markeredgecolor='black', markeredgewidth=2, markersize=12),
+    ]
+    ax.legend(handles=legend_elements, loc='lower center', ncol=4, bbox_to_anchor=(0.5, -0.05), frameon=False)
+
+    # Converter para imagem para o clique funcionar
     buf = BytesIO()
-    plt.savefig(buf, format="png", dpi=150, bbox_inches='tight', transparent=False)
+    plt.savefig(buf, format="png", dpi=120, bbox_inches='tight')
     buf.seek(0)
-    img = Image.open(buf)
+    img_obj = Image.open(buf)
     
-    # Render interactive image
-    click = streamlit_image_coordinates(img, width=700)
+    # Renderizar imagem interativa com largura fixa
+    click = streamlit_image_coordinates(img_obj, width=700)
 
 # ==========================
-# 4. INTERACTION & DETAILS
+# 3. INTERACTION LOGIC
 # ==========================
 selected_shot = None
 
 if click is not None:
-    # Scaling click coordinates to real image size
-    real_w, real_h = img.size
+    real_w, real_h = img_obj.size
     disp_w, disp_h = click["width"], click["height"]
     
     pixel_x = click["x"] * (real_w / disp_w)
     pixel_y = click["y"] * (real_h / disp_h)
     
-    # Reverse transform pixels to field coordinates
-    coords = ax.transData.inverted().transform((pixel_x, real_h - pixel_y))
+    # Inverter Y para lógica do Matplotlib e transformar em coordenadas de campo
+    mpl_pixel_y = real_h - pixel_y
+    coords = ax.transData.inverted().transform((pixel_x, mpl_pixel_y))
     field_x, field_y = coords[0], coords[1]
 
-    # Find closest shot (Euclidean distance)
+    # Calcular distância (Euclidiana)
     df_shots["dist"] = np.sqrt((df_shots["x"] - field_x)**2 + (df_shots["y"] - field_y)**2)
     
-    closest = df_shots.loc[df_shots["dist"].idxmin()]
-    if closest["dist"] < 3.5: # Tolerance threshold
-        selected_shot = closest
+    # Raio de tolerância para o clique
+    RADIUS = 4 
+    candidates = df_shots[df_shots["dist"] < RADIUS]
 
-with col2:
+    if not candidates.empty:
+        # Priorizar finalizações que têm vídeo no clique
+        with_vid = candidates[candidates["video"].notnull()]
+        if not with_vid.empty:
+            selected_shot = with_vid.loc[with_vid["dist"].idxmin()]
+        else:
+            selected_shot = candidates.loc[candidates["dist"].idxmin()]
+
+# ==========================
+# 4. VIDEO & STATS (LATERAL)
+# ==========================
+with col_vid:
     st.subheader("Shot Analysis")
     
     if selected_shot is not None:
         outcome = selected_shot['outcome']
-        color = '#EF476F' if outcome == "Goal" else ('#06D6A0' if outcome == "On Target" else '#FFD166')
+        st.success(f"**Shot Result:** {outcome}")
         
-        # English Info Card
-        st.markdown(f"""
-        <div style="padding:20px; border-radius:10px; border-left: 10px solid {color}; background-color: #262730; color: white;">
-            <h3 style="margin:0;">Outcome: {outcome}</h3>
-            <p style="margin:5px 0 0 0; opacity: 0.8;"><b>Coordinates:</b> X: {selected_shot['x']:.1f}, Y: {selected_shot['y']:.1f}</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.write("---")
-        
-        # Video Section
-        if pd.notnull(selected_shot["video"]):
-            st.video(selected_shot["video"])
+        if selected_shot["video"]:
+            try:
+                st.video(selected_shot["video"])
+            except:
+                st.error("Video file not found.")
         else:
-            st.info("No video footage available for this specific shot.")
+            st.warning("No video available for this shot.")
             
-        # Metrics
         dist_to_goal = np.sqrt((120 - selected_shot['x'])**2 + (40 - selected_shot['y'])**2)
-        st.metric("Estimated Distance to Goal", f"{dist_to_goal:.1f} m")
-        
+        st.metric("Distance to Goal", f"{dist_to_goal:.1f} m")
     else:
-        st.info("Please click on a marker on the map to display shot data and video.")
+        st.info("Click a marker with a **black border** to watch the clip.")
+
+    st.write("---")
+    st.subheader("Efficiency by Zone")
+    
+    s1, s2 = st.columns(2)
+    for zone, col in zip(["CENTRAL", "SIDE"], [s1, s2]):
+        subset = df_shots[df_shots["zone"] == zone]
+        total = len(subset)
+        goals = len(subset[subset["outcome"] == "Goal"])
+        acc = (len(subset[subset["outcome"] != "Off Target"]) / total * 100) if total > 0 else 0
+        
+        col.metric(
+            label=f"{zone} SHOTS", 
+            value=f"{goals} Goals / {total}", 
+            delta=f"{acc:.1f}% Accuracy"
+        )
 
 # ==========================
-# 5. STATISTICS SUMMARY
+# 5. GENERAL SUMMARY
 # ==========================
 st.write("---")
 st.subheader("Game Summary")
 total_shots = len(df_shots)
 goals = len(df_shots[df_shots["outcome"] == "Goal"])
-on_target = len(df_shots[df_shots["outcome"] == "On Target"])
-accuracy = ((goals + on_target) / total_shots) * 100
+accuracy = (len(df_shots[df_shots["outcome"] != "Off Target"]) / total_shots * 100)
 
-m1, m2, m3, m4 = st.columns(4)
+m1, m2, m3 = st.columns(3)
 m1.metric("Total Shots", total_shots)
-m2.metric("Goals", goals)
-m3.metric("On Target", on_target)
-m4.metric("Shooting Accuracy", f"{accuracy:.1f}%")
+m2.metric("Total Goals", goals)
+m3.metric("Overall Accuracy", f"{accuracy:.1f}%")
