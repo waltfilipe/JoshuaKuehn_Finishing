@@ -1,8 +1,6 @@
-streamlit>=1.31.0
+streamlit
 pandas
 matplotlib
-numpy
 mplsoccer
+numpy
 streamlit-image-coordinates
-Pillow
-altair<5
