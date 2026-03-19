@@ -20,13 +20,13 @@ st.caption("Click on the icons on the pitch to play the corresponding shot video
 # Data Setup (Identical structure to your working code)
 # ==========================
 shots_raw = [
-    ("GOAL", 115.0, 40.0, "videos/Fin 1.mp4"),
-    ("ON TARGET", 105.0, 35.0, "videos/Fin 2.mp4"),
-    ("OFF TARGET", 98.0, 50.0, "videos/Fin 3.mp4"),
-    ("ON TARGET", 110.0, 45.0, "videos/Fin 4.mp4"),
-    ("GOAL", 112.0, 38.0, "videos/Fin 5.mp4"),
-    ("OFF TARGET", 102.0, 25.0, "videos/Fin 6.mp4"),
-    ("ON TARGET", 108.0, 42.0, "videos/Fin 7.mp4"),
+    ("ON TARGET", 93.08, 43.99, "videos/Fin 1.mp4"),  # 13:51 – Finalização A GOL
+    ("GOAL", 101.06, 37.84, "videos/Fin 2.mp4"),       # 30:11 – Finalização GOL
+    ("OFF TARGET", 97.24, 54.46, "videos/Fin 3.mp4"),  # 34:01 – Finalização FORA
+    ("OFF TARGET", 105.38, 49.64, "videos/Fin 4.mp4"), # 35:28 – Finalização FORA
+    ("OFF TARGET", 111.70, 41.83, "videos/Fin 5.mp4"), # 48:13 – Finalização FORA
+    ("ON TARGET", 95.24, 49.64, "videos/Fin 6.mp4"),   # 57:46 – Finalização (Assumido On Target)
+    ("ON TARGET", 109.37, 45.15, "videos/Fin 7.mp4"),  # 58:38 – Finalização (Assumido On Target)
 ]
 
 df = pd.DataFrame(shots_raw, columns=["type", "x", "y", "video"])
