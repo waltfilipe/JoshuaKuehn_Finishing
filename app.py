@@ -95,7 +95,7 @@ with col_map:
     plt.savefig(
         buf,
         format="png",
-        dpi=100,
+        dpi=200,
         bbox_inches='tight',
         facecolor='#1a1a1a'
     )
@@ -124,7 +124,7 @@ if click is not None:
 
     df["dist"] = np.sqrt((df["x"] - field_x)**2 + (df["y"] - field_y)**2)
 
-    RADIUS = 5
+    RADIUS = 7
     candidates = df[df["dist"] < RADIUS]
 
     if not candidates.empty:
