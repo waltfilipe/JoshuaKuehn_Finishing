@@ -5,12 +5,13 @@ from mplsoccer import VerticalPitch
 from streamlit_image_coordinates import streamlit_image_coordinates
 from io import BytesIO
 import numpy as np
+from PIL import Image
 
 st.set_page_config(layout="wide")
 st.title("Shot Map with Video")
 
 # ==========================
-# 1. RAW DATA
+# 1. DATA
 # ==========================
 
 shots_raw = [
@@ -26,7 +27,7 @@ shots_raw = [
 df = pd.DataFrame(shots_raw, columns=["result", "x", "y", "video"])
 
 # ==========================
-# 2. SPLIT TYPES
+# 2. SPLIT
 # ==========================
 
 goal = df[df["result"] == "GOAL"]
@@ -34,7 +35,7 @@ on_target = df[df["result"] == "ON TARGET"]
 off_target = df[df["result"] == "OFF TARGET"]
 
 # ==========================
-# 3. CREATE PITCH
+# 3. PLOT PITCH
 # ==========================
 
 pitch = VerticalPitch(
@@ -60,21 +61,18 @@ pitch.scatter(off_target.x, off_target.y, s=SIZE, marker='o',
               c='#FFD166', edgecolors='#1f1f1f',
               linewidth=1.2, ax=ax, label='Off Target')
 
-legend = ax.legend(
-    loc='upper left',
-    bbox_to_anchor=(0.02, 0.98),
-    frameon=True,
-    fontsize=10,
-    title="Shots"
-)
+ax.legend(loc='upper left')
 
 # ==========================
-# 4. CONVERT FIG TO IMAGE
+# 4. FIG → IMAGE (FIX)
 # ==========================
 
 buf = BytesIO()
 plt.savefig(buf, format="png", dpi=200, bbox_inches="tight")
+plt.close(fig)
 buf.seek(0)
+
+img = Image.open(buf)
 
 # ==========================
 # 5. LAYOUT
@@ -84,37 +82,38 @@ col1, col2 = st.columns([1, 1])
 
 with col1:
     st.subheader("Shot Map")
-
-    value = streamlit_image_coordinates(buf)
+    click = streamlit_image_coordinates(img)
 
 # ==========================
-# 6. CLICK DETECTION
+# 6. CLICK → PITCH (IMPROVED)
 # ==========================
 
 selected_video = None
 
-if value is not None:
-    click_x = value["x"]
-    click_y = value["y"]
+if click is not None:
+    img_w, img_h = img.size
 
-    # Normalize click (image -> pitch scale)
-    img_w, img_h = value["width"], value["height"]
+    click_x = click["x"]
+    click_y = click["y"]
 
-    # Convert to pitch coordinates (approximation)
+    # Convert image coords → pitch coords (StatsBomb: 120x80)
     pitch_x = (click_x / img_w) * 120
-    pitch_y = (click_y / img_h) * 80
+    pitch_y = 80 - (click_y / img_h) * 80  # invert Y axis
 
-    # Find closest shot
-    df["distance"] = np.sqrt((df["x"] - pitch_x)**2 + (df["y"] - pitch_y)**2)
+    # Distance calculation
+    df["distance"] = np.sqrt(
+        (df["x"] - pitch_x) ** 2 +
+        (df["y"] - pitch_y) ** 2
+    )
 
     closest = df.loc[df["distance"].idxmin()]
 
-    # Threshold (important to avoid random clicks)
-    if closest["distance"] < 8:
+    # Threshold for click precision
+    if closest["distance"] < 6:
         selected_video = closest["video"]
 
 # ==========================
-# 7. VIDEO DISPLAY
+# 7. VIDEO
 # ==========================
 
 with col2:
@@ -123,4 +122,4 @@ with col2:
     if selected_video:
         st.video(selected_video)
     else:
-        st.info("Click on a shot to view the video.")
+        st.info("Click on a shot to display the video.")
