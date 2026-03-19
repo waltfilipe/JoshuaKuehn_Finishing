@@ -5,72 +5,87 @@ from mplsoccer import VerticalPitch
 import os
 
 # Streamlit Page Configuration
-st.set_page_config(page_title="Pro Shot Map", layout="centered")
+st.set_page_config(page_title="Shot Map & Video Analysis", layout="centered")
 
 def main():
-    st.title("🎯 Precision Shot Map")
-    
+    st.title("⚽ Shot Analysis Dashboard")
+
     # ==========================
-    # 1. DATA & PITCH (Same as before)
+    # 1. DATA
     # ==========================
     data = {
+        "id": ["Fin 1", "Fin 2", "Fin 3", "Fin 4", "Fin 5", "Fin 6", "Fin 7"],
         "x": [93.08, 101.06, 97.24, 105.38, 111.70, 95.24, 109.37],
         "y": [43.99, 37.84, 54.46, 49.64, 41.83, 49.64, 45.15],
         "outcome": ["On Target", "Goal", "Off Target", "Off Target", "Off Target", "On Target", "On Target"]
     }
     df_shots = pd.DataFrame(data)
 
-    # Pitch Setup
+    # ==========================
+    # 2. PITCH VISUALIZATION
+    # ==========================
     pitch = VerticalPitch(
         half=True,
         pitch_type='statsbomb',
-        pitch_color='#0e1117', 
-        line_color='#c7c7c7',
+        pitch_color='#000000', # Pure black
+        line_color='#555555', # Dimmed lines for focus on markers
         linewidth=2
     )
-    fig, ax = pitch.draw(figsize=(12, 9))
-    fig.patch.set_facecolor('#0e1117')
+    fig, ax = pitch.draw(figsize=(10, 8))
+    fig.patch.set_facecolor('#000000')
     
-    SIZE = 700 
+    SIZE = 800 # Large markers as requested
 
-    # Plotting Logic
-    for outcome, color, marker in zip(["Goal", "On Target", "Off Target"], 
-                                      ["#EF476F", "#06D6A0", "#FFD166"], 
-                                      ["*", "h", "o"]):
-        subset = df_shots[df_shots["outcome"] == outcome]
+    # Plotting logic with smaller legend settings
+    outcomes = [("Goal", "#EF476F", "*"), ("On Target", "#06D6A0", "h"), ("Off Target", "#FFD166", "o")]
+    
+    for label, color, marker in outcomes:
+        subset = df_shots[df_shots["outcome"] == label]
         if not subset.empty:
-            pitch.scatter(subset.x, subset.y, s=SIZE if marker != "*" else SIZE+300, 
+            pitch.scatter(subset.x, subset.y, s=SIZE if marker != "*" else SIZE+400, 
                           marker=marker, c=color, edgecolors='#ffffff', 
-                          linewidth=1.5, ax=ax, label=outcome)
+                          linewidth=1.5, ax=ax, label=label)
 
-    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.02), ncol=3, 
-              frameon=False, fontsize=12, labelcolor='white')
+    # LEGEND: Small and discreet
+    ax.legend(
+        loc='upper left',
+        bbox_to_anchor=(0.02, 0.98),
+        frameon=False,
+        fontsize=9,      # Smaller font
+        labelcolor='white',
+        handletextpad=0.2
+    )
 
-    # Display the Chart
     st.pyplot(fig)
 
     # ==========================
-    # 2. ADDING THE VIDEO BELOW
+    # 3. VIDEO SELECTOR
     # ==========================
     st.markdown("---")
-    st.subheader("Match Highlights")
+    st.subheader("Video Replay")
 
-    # Path to your video file
-    # Replace 'match_video.mp4' with your actual file name
-    video_path = os.path.join("videos", "match_video.mp4")
+    # List of available shot IDs from the dataframe
+    shot_options = df_shots["id"].tolist()
+    
+    selected_shot = st.selectbox("Select a shot to watch:", shot_options)
+
+    # Path logic: videos/Fin 1.mp4, etc.
+    # Adjust the extension (.mp4, .mov) if needed
+    video_filename = f"{selected_shot}.mp4"
+    video_path = os.path.join("videos", video_filename)
 
     if os.path.exists(video_path):
         st.video(
             video_path, 
             format="video/mp4", 
-            start_time=0,
-            loop=True,      # Keeps the video running
-            autoplay=True,  # Starts automatically
-            muted=True      # Most browsers require mute for autoplay to work
+            loop=True, 
+            autoplay=True, 
+            muted=True
         )
+        st.caption(f"Currently playing: {video_filename}")
     else:
-        st.error(f"Video file not found at: {video_path}")
-        st.info("Make sure the file name is correct and it is inside the 'videos' folder.")
+        st.warning(f"Video not found: {video_path}")
+        st.info("Check if your files in GitHub are named exactly like 'Fin 1.mp4' inside the 'videos' folder.")
 
 if __name__ == "__main__":
     main()
