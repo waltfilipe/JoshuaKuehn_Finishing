@@ -1,6 +1,3 @@
 streamlit
+plotly
 pandas
-matplotlib
-mplsoccer
-numpy
-streamlit-image-coordinates
