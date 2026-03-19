@@ -122,7 +122,10 @@ if click is not None:
 
     field_x, field_y = coords[0], coords[1]
 
-    df["dist"] = np.sqrt((df["x"] - field_x)**2 + (df["y"] - field_y)**2)
+    df["dist"] = np.sqrt(
+    ((df["x"] - field_x) / 1.2)**2 +   # ajuste eixo X
+    ((df["y"] - field_y) / 0.8)**2     # ajuste eixo Y
+)
 
     RADIUS = 4
     candidates = df[df["dist"] < RADIUS]
