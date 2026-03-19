@@ -4,14 +4,15 @@ import matplotlib.pyplot as plt
 from mplsoccer import VerticalPitch
 import os
 
-# Streamlit Page Configuration
-st.set_page_config(page_title="Shot Map & Video Analysis", layout="centered")
+# Configuração da página
+st.set_page_config(page_title="Pro Shot Analysis", layout="centered")
 
 def main():
-    st.title("⚽ Shot Analysis Dashboard")
+    # Estilo Dark para o Streamlit
+    st.markdown("<h1 style='text-align: center; color: white;'>🎯 Shot Analysis</h1>", unsafe_allow_html=True)
 
     # ==========================
-    # 1. DATA
+    # 1. DADOS DAS FINALIZAÇÕES
     # ==========================
     data = {
         "id": ["Fin 1", "Fin 2", "Fin 3", "Fin 4", "Fin 5", "Fin 6", "Fin 7"],
@@ -22,70 +23,71 @@ def main():
     df_shots = pd.DataFrame(data)
 
     # ==========================
-    # 2. PITCH VISUALIZATION
+    # 2. MAPA BLACK & GOLD/NEON
     # ==========================
     pitch = VerticalPitch(
         half=True,
         pitch_type='statsbomb',
-        pitch_color='#000000', # Pure black
-        line_color='#555555', # Dimmed lines for focus on markers
-        linewidth=2
+        pitch_color='#000000', 
+        line_color='#333333', # Linhas sutis para não poluir
+        linewidth=1.5
     )
+    
     fig, ax = pitch.draw(figsize=(10, 8))
     fig.patch.set_facecolor('#000000')
-    
-    SIZE = 800 # Large markers as requested
 
-    # Plotting logic with smaller legend settings
-    outcomes = [("Goal", "#EF476F", "*"), ("On Target", "#06D6A0", "h"), ("Off Target", "#FFD166", "o")]
-    
-    for label, color, marker in outcomes:
-        subset = df_shots[df_shots["outcome"] == label]
-        if not subset.empty:
-            pitch.scatter(subset.x, subset.y, s=SIZE if marker != "*" else SIZE+400, 
-                          marker=marker, c=color, edgecolors='#ffffff', 
-                          linewidth=1.5, ax=ax, label=label)
+    # Configurações visuais
+    SIZE = 700
+    COLORS = {"Goal": "#EF476F", "On Target": "#06D6A0", "Off Target": "#FFD166"}
+    MARKERS = {"Goal": "*", "On Target": "h", "Off Target": "o"}
 
-    # LEGEND: Small and discreet
-    ax.legend(
-        loc='upper left',
-        bbox_to_anchor=(0.02, 0.98),
-        frameon=False,
-        fontsize=9,      # Smaller font
-        labelcolor='white',
-        handletextpad=0.2
-    )
+    # Plotar cada chute individualmente para colocar o ID embaixo
+    for i, row in df_shots.iterrows():
+        # Desenha o ícone
+        pitch.scatter(
+            row.x, row.y, 
+            s=SIZE if row.outcome != "Goal" else SIZE + 400,
+            marker=MARKERS[row.outcome],
+            c=COLORS[row.outcome],
+            edgecolors='#ffffff',
+            linewidth=1.2,
+            ax=ax,
+            zorder=3
+        )
+        
+        # LEGENDA ELEGANTE EMBAIXO DO ÍCONE
+        # Ajustamos o 'y' ligeiramente para o texto não sobrepor o ícone
+        pitch.annotate(
+            row.id, 
+            xy=(row.x - 2.5, row.y), # Pequeno offset para ficar logo abaixo no VerticalPitch
+            ax=ax, 
+            color='white', 
+            fontsize=9, 
+            fontweight='bold',
+            ha='center',
+            va='center',
+            alpha=0.8
+        )
 
     st.pyplot(fig)
 
     # ==========================
-    # 3. VIDEO SELECTOR
+    # 3. SELETOR DE VÍDEO
     # ==========================
-    st.markdown("---")
-    st.subheader("Video Replay")
-
-    # List of available shot IDs from the dataframe
-    shot_options = df_shots["id"].tolist()
+    st.markdown("<br>", unsafe_allow_html=True)
     
-    selected_shot = st.selectbox("Select a shot to watch:", shot_options)
+    # Criando colunas para o seletor ficar centralizado e elegante
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        selected_shot = st.selectbox("📺 Select Replay:", df_shots["id"].tolist())
 
-    # Path logic: videos/Fin 1.mp4, etc.
-    # Adjust the extension (.mp4, .mov) if needed
-    video_filename = f"{selected_shot}.mp4"
-    video_path = os.path.join("videos", video_filename)
+    # Caminho do vídeo
+    video_path = os.path.join("videos", f"{selected_shot}.mp4")
 
     if os.path.exists(video_path):
-        st.video(
-            video_path, 
-            format="video/mp4", 
-            loop=True, 
-            autoplay=True, 
-            muted=True
-        )
-        st.caption(f"Currently playing: {video_filename}")
+        st.video(video_path, loop=True, autoplay=True, muted=True)
     else:
-        st.warning(f"Video not found: {video_path}")
-        st.info("Check if your files in GitHub are named exactly like 'Fin 1.mp4' inside the 'videos' folder.")
+        st.info(f"🎥 Video for {selected_shot} will appear here when uploaded to '/videos'.")
 
 if __name__ == "__main__":
     main()
