@@ -3,45 +3,45 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from mplsoccer import VerticalPitch
 
-st.set_page_config(layout="wide")
+# Streamlit Page Configuration
+st.set_page_config(page_title="Shot Map Dashboard", layout="centered")
 
-# ==========================
-# DATA
-# ==========================
+def main():
+    st.title("⚽ Football Shot Map")
+    st.markdown("Visualizing shot data using `mplsoccer` and `Streamlit`.")
 
-shots_raw = [
-    ("ON TARGET", 93.08, 43.99, "videos/Fin 1.mp4"),
-    ("GOAL", 101.06, 37.84, "videos/Fin 2.mp4"),
-    ("OFF TARGET", 97.24, 54.46, "videos/Fin 3.mp4"),
-    ("OFF TARGET", 105.38, 49.64, "videos/Fin 4.mp4"),
-    ("OFF TARGET", 111.70, 41.83, "videos/Fin 5.mp4"),
-    ("ON TARGET", 95.24, 49.64, "videos/Fin 6.mp4"),
-    ("ON TARGET", 109.37, 45.15, "videos/Fin 7.mp4"),
-]
+    # ==========================
+    # 1. SHOT DATA
+    # ==========================
+    # Creating the initial DataFrame
+    data = {
+        "x": [93.08, 101.06, 97.24, 105.38, 111.70, 95.24, 109.37],
+        "y": [43.99, 37.84, 54.46, 49.64, 41.83, 49.64, 45.15],
+        "outcome": ["On Target", "Goal", "Off Target", "Off Target", "Off Target", "On Target", "On Target"]
+    }
+    df_shots = pd.DataFrame(data)
 
-df = pd.DataFrame(shots_raw, columns=["result", "x", "y", "video"])
-df["id"] = df.index + 1
+    # Sidebar Filters
+    st.sidebar.header("Filter Options")
+    selected_outcomes = st.sidebar.multiselect(
+        "Select outcomes to display:",
+        options=["Goal", "On Target", "Off Target"],
+        default=["Goal", "On Target", "Off Target"]
+    )
 
-# ==========================
-# SESSION STATE
-# ==========================
+    # Filter data based on selection
+    df_filtered = df_shots[df_shots["outcome"].isin(selected_outcomes)]
 
-if "selected" not in st.session_state:
-    st.session_state.selected = 0
+    # ==========================
+    # 2. PITCH CALCULATION
+    # ==========================
+    
+    # Split data for plotting
+    shots_goal = df_filtered[df_filtered["outcome"] == "Goal"]
+    shots_on_target = df_filtered[df_filtered["outcome"] == "On Target"]
+    shots_off_target = df_filtered[df_filtered["outcome"] == "Off Target"]
 
-# ==========================
-# LAYOUT
-# ==========================
-
-col1, col2 = st.columns([2, 1])
-
-# ==========================
-# LEFT: PITCH
-# ==========================
-
-with col1:
-    st.title("Finalizações")
-
+    # Setup the pitch
     pitch = VerticalPitch(
         half=True,
         pitch_type='statsbomb',
@@ -49,63 +49,49 @@ with col1:
         line_color='white'
     )
 
-    fig, ax = pitch.draw(figsize=(6, 8))
+    fig, ax = pitch.draw(figsize=(10, 8))
+    
+    # Marker size
+    SIZE = 320 
 
-    for i, row in df.iterrows():
+    # Plot Goals (Stars)
+    if not shots_goal.empty:
+        pitch.scatter(shots_goal.x, shots_goal.y, s=SIZE, marker='*', c='#EF476F', 
+                      edgecolors='#1f1f1f', linewidth=1.2, ax=ax, label='Goal')
 
-        # highlight selected
-        if i == st.session_state.selected:
-            size = 500
-            edge = "black"
-            lw = 2.5
-        else:
-            size = 300
-            edge = "#1f1f1f"
-            lw = 1.2
+    # Plot On Target (Hexagons)
+    if not shots_on_target.empty:
+        pitch.scatter(shots_on_target.x, shots_on_target.y, s=SIZE, marker='h', c='#06D6A0', 
+                      edgecolors='#1f1f1f', linewidth=1.2, ax=ax, label='On Target')
 
-        # color
-        if row["result"] == "GOAL":
-            color = "#EF476F"
-            marker = "*"
-        elif row["result"] == "ON TARGET":
-            color = "#06D6A0"
-            marker = "h"
-        else:
-            color = "#FFD166"
-            marker = "o"
+    # Plot Off Target (Circles)
+    if not shots_off_target.empty:
+        pitch.scatter(shots_off_target.x, shots_off_target.y, s=SIZE, marker='o', c='#FFD166', 
+                      edgecolors='#1f1f1f', linewidth=1.2, ax=ax, label='Off Target')
 
-        pitch.scatter(
-            row["x"], row["y"],
-            s=size,
-            c=color,
-            marker=marker,
-            edgecolors=edge,
-            linewidth=lw,
-            ax=ax
-        )
-
-        # label number
-        ax.text(row["x"], row["y"], str(row["id"]),
-                ha='center', va='center', fontsize=8, color='black')
-
-    st.pyplot(fig)
-
-# ==========================
-# RIGHT: VIDEO + SELECTOR
-# ==========================
-
-with col2:
-    st.title("Vídeo")
-
-    # selector (simulates click)
-    selected_id = st.radio(
-        "Escolha a finalização:",
-        df["id"],
-        index=st.session_state.selected
+    # Refined Legend
+    legend = ax.legend(
+        loc='upper left',
+        bbox_to_anchor=(0.02, 0.98),
+        frameon=True,
+        fontsize=11,
+        title="Shot Outcomes",
+        title_fontsize=12
     )
 
-    st.session_state.selected = selected_id - 1
+    # Clean Legend Frame Style
+    frame = legend.get_frame()
+    frame.set_facecolor("#ffffff")
+    frame.set_edgecolor("#d9d9d9")
 
-    video_path = df.loc[st.session_state.selected, "video"]
+    # ==========================
+    # 3. STREAMLIT DISPLAY
+    # ==========================
+    st.pyplot(fig)
 
-    st.video(video_path)
+    # Show raw data option
+    with st.expander("View raw data table"):
+        st.dataframe(df_filtered, use_container_width=True)
+
+if __name__ == "__main__":
+    main()
