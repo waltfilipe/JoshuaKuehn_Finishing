@@ -5,14 +5,13 @@ from mplsoccer import VerticalPitch
 import os
 
 # Configuração da página
-st.set_page_config(page_title="Pro Shot Analysis", layout="centered")
+st.set_page_config(page_title="Pro Shot Map", layout="centered")
 
 def main():
-    # Estilo Dark para o Streamlit
-    st.markdown("<h1 style='text-align: center; color: white;'>🎯 Shot Analysis</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; color: white;'>🎯 Match Analysis: Shots</h1>", unsafe_allow_html=True)
 
     # ==========================
-    # 1. DADOS DAS FINALIZAÇÕES
+    # 1. DADOS
     # ==========================
     data = {
         "id": ["Fin 1", "Fin 2", "Fin 3", "Fin 4", "Fin 5", "Fin 6", "Fin 7"],
@@ -23,71 +22,101 @@ def main():
     df_shots = pd.DataFrame(data)
 
     # ==========================
-    # 2. MAPA BLACK & GOLD/NEON
+    # 2. PITCH & PLOT
     # ==========================
     pitch = VerticalPitch(
         half=True,
         pitch_type='statsbomb',
         pitch_color='#000000', 
-        line_color='#333333', # Linhas sutis para não poluir
+        line_color='#444444',
         linewidth=1.5
     )
     
     fig, ax = pitch.draw(figsize=(10, 8))
     fig.patch.set_facecolor('#000000')
 
-    # Configurações visuais
+    # Configurações de Estilo
     SIZE = 700
-    COLORS = {"Goal": "#EF476F", "On Target": "#06D6A0", "Off Target": "#FFD166"}
-    MARKERS = {"Goal": "*", "On Target": "h", "Off Target": "o"}
+    SETTINGS = {
+        "Goal": {"color": "#EF476F", "marker": "*", "label": "Goal"},
+        "On Target": {"color": "#06D6A0", "marker": "h", "label": "On Target"},
+        "Off Target": {"color": "#FFD166", "marker": "o", "label": "Off Target"}
+    }
 
-    # Plotar cada chute individualmente para colocar o ID embaixo
+    # Plotar os chutes e IDs
     for i, row in df_shots.iterrows():
-        # Desenha o ícone
+        s_info = SETTINGS[row.outcome]
+        
+        # Desenha o ícone no campo
         pitch.scatter(
             row.x, row.y, 
             s=SIZE if row.outcome != "Goal" else SIZE + 400,
-            marker=MARKERS[row.outcome],
-            c=COLORS[row.outcome],
+            marker=s_info["marker"],
+            c=s_info["color"],
             edgecolors='#ffffff',
             linewidth=1.2,
             ax=ax,
             zorder=3
         )
         
-        # LEGENDA ELEGANTE EMBAIXO DO ÍCONE
-        # Ajustamos o 'y' ligeiramente para o texto não sobrepor o ícone
+        # ID da Finalização (Fin X)
         pitch.annotate(
             row.id, 
-            xy=(row.x - 2.5, row.y), # Pequeno offset para ficar logo abaixo no VerticalPitch
+            xy=(row.x - 3, row.y), 
             ax=ax, 
-            color='white', 
-            fontsize=9, 
+            color='#aaaaaa', 
+            fontsize=8, 
             fontweight='bold',
             ha='center',
-            va='center',
-            alpha=0.8
+            va='center'
         )
+
+    # ==========================
+    # 3. LEGENDA REFINADA (BOX BRANCO)
+    # ==========================
+    from matplotlib.lines import Line2D
+
+    # Criando os elementos customizados para a legenda
+    legend_elements = [
+        Line2D([0], [0], marker='*', color='w', label='Goal',
+               markerfacecolor='#EF476F', markersize=12, markeredgecolor='black', linestyle='None'),
+        Line2D([0], [0], marker='h', color='w', label='On Target',
+               markerfacecolor='#06D6A0', markersize=10, markeredgecolor='black', linestyle='None'),
+        Line2D([0], [0], marker='o', color='w', label='Off Target',
+               markerfacecolor='#FFD166', markersize=10, markeredgecolor='black', linestyle='None')
+    ]
+
+    legend = ax.legend(
+        handles=legend_elements,
+        loc='upper left',
+        bbox_to_anchor=(0.02, 0.98),
+        frameon=True,
+        facecolor='white',
+        edgecolor='black',
+        fontsize=10,
+        title="Shot Outcome",
+        title_fontsize=11,
+        borderpad=1,
+        labelspacing=1.2
+    )
+    legend.get_title().set_fontweight('bold')
 
     st.pyplot(fig)
 
     # ==========================
-    # 3. SELETOR DE VÍDEO
+    # 4. VIDEO SELECTOR
     # ==========================
-    st.markdown("<br>", unsafe_allow_html=True)
-    
-    # Criando colunas para o seletor ficar centralizado e elegante
+    st.markdown("---")
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        selected_shot = st.selectbox("📺 Select Replay:", df_shots["id"].tolist())
+        selected_shot = st.selectbox("🎞️ Choose Replay:", df_shots["id"].tolist())
 
-    # Caminho do vídeo
     video_path = os.path.join("videos", f"{selected_shot}.mp4")
 
     if os.path.exists(video_path):
         st.video(video_path, loop=True, autoplay=True, muted=True)
     else:
-        st.info(f"🎥 Video for {selected_shot} will appear here when uploaded to '/videos'.")
+        st.info(f"Video `{selected_shot}.mp4` not found in /videos.")
 
 if __name__ == "__main__":
     main()
