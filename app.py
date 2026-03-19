@@ -17,26 +17,26 @@ st.title("Shot Map Analysis")
 st.caption("Click on the icons on the pitch to play the corresponding shot video.")
 
 # ==========================
-# Data Setup (Identical structure to your working code)
+# Data Setup (Updated with your coordinates)
 # ==========================
 shots_raw = [
-    ("GOAL", 115.0, 40.0, "videos/Fin 1.mp4"),
-    ("ON TARGET", 105.0, 35.0, "videos/Fin 2.mp4"),
-    ("OFF TARGET", 98.0, 50.0, "videos/Fin 3.mp4"),
-    ("ON TARGET", 110.0, 45.0, "videos/Fin 4.mp4"),
-    ("GOAL", 112.0, 38.0, "videos/Fin 5.mp4"),
-    ("OFF TARGET", 102.0, 25.0, "videos/Fin 6.mp4"),
-    ("ON TARGET", 108.0, 42.0, "videos/Fin 7.mp4"),
+    ("ON TARGET", 93.08, 43.99, "videos/Fin 1.mp4"),
+    ("GOAL", 101.06, 37.84, "videos/Fin 2.mp4"),
+    ("OFF TARGET", 97.24, 54.46, "videos/Fin 3.mp4"),
+    ("OFF TARGET", 105.38, 49.64, "videos/Fin 4.mp4"),
+    ("OFF TARGET", 111.70, 41.83, "videos/Fin 5.mp4"),
+    ("ON TARGET", 95.24, 49.64, "videos/Fin 6.mp4"),
+    ("ON TARGET", 109.37, 45.15, "videos/Fin 7.mp4"),
 ]
 
 df = pd.DataFrame(shots_raw, columns=["type", "x", "y", "video"])
 
 def get_style(outcome):
     if outcome == "GOAL":
-        return '*', '#EF476F', 150  # Pink Star
+        return '*', '#EF476F', 250  # Pink Star
     if outcome == "ON TARGET":
-        return 'h', '#06D6A0', 120  # Green Hexagon
-    return 'o', '#FFD166', 100      # Yellow Circle
+        return 'h', '#06D6A0', 180  # Green Hexagon
+    return 'o', '#FFD166', 150      # Yellow Circle
 
 # ==========================
 # Main Layout
@@ -44,37 +44,36 @@ def get_style(outcome):
 col_map, col_vid = st.columns([1, 1])
 
 with col_map:
-    st.subheader("Interactive Pitch Map")
-    # Pitch Setup: Black background to match your request
-    pitch = Pitch(pitch_type='statsbomb', pitch_color='#1a1a1a', line_color='#c2c2c2')
+    st.subheader("Interactive Half-Pitch Map")
+    
+    # Pitch Setup: Added half=True and maintained Black background
+    pitch = Pitch(half=True, pitch_type='statsbomb', pitch_color='#1a1a1a', line_color='#c2c2c2')
     fig, ax = pitch.draw(figsize=(8, 6))
     
     for _, row in df.iterrows():
         marker, color, size = get_style(row["type"])
-        # Using white edge to make markers pop on black background
         pitch.scatter(row.x, row.y, marker=marker, s=size, color=color, 
-                      edgecolors='white', linewidths=0.8, ax=ax, zorder=3)
+                      edgecolors='white', linewidths=1.0, ax=ax, zorder=3)
 
     # Legend
     legend_elements = [
-        Line2D([0], [0], marker='*', color='w', label='Goal', markerfacecolor='#EF476F', markersize=10, linestyle='None'),
-        Line2D([0], [0], marker='h', color='w', label='On Target', markerfacecolor='#06D6A0', markersize=8, linestyle='None'),
-        Line2D([0], [0], marker='o', color='w', label='Off Target', markerfacecolor='#FFD166', markersize=8, linestyle='None'),
+        Line2D([0], [0], marker='*', color='w', label='Goal', markerfacecolor='#EF476F', markersize=12, linestyle='None'),
+        Line2D([0], [0], marker='h', color='w', label='On Target', markerfacecolor='#06D6A0', markersize=10, linestyle='None'),
+        Line2D([0], [0], marker='o', color='w', label='Off Target', markerfacecolor='#FFD166', markersize=10, linestyle='None'),
     ]
     ax.legend(handles=legend_elements, loc='upper left', frameon=True, fontsize='small')
 
     # Convert plot to image for coordinate tracking
     buf = BytesIO()
-    # Ensure the savefig also uses the dark background
     plt.savefig(buf, format="png", dpi=100, bbox_inches='tight', facecolor='#1a1a1a')
     buf.seek(0)
     img_obj = Image.open(buf)
     
-    # Use fixed width (700) exactly like your working code
+    # Click interaction
     click = streamlit_image_coordinates(img_obj, width=700)
 
 # ==========================
-# Interaction Logic (Exact same as Duel Map)
+# Interaction Logic
 # ==========================
 selected_event = None
 
@@ -91,7 +90,8 @@ if click is not None:
 
     df["dist"] = np.sqrt((df["x"] - field_x)**2 + (df["y"] - field_y)**2)
     
-    RADIUS = 5 
+    # Radius threshold
+    RADIUS = 4 
     candidates = df[df["dist"] < RADIUS]
 
     if not candidates.empty:
@@ -111,4 +111,4 @@ with col_vid:
             except:
                 st.error(f"Video file not found: {selected_event['video']}")
     else:
-        st.info("Select a marker on the pitch to load the video analysis.")
+        st.info("Select a marker on the half-pitch to load the video analysis.")
