@@ -24,7 +24,7 @@ def get_data():
         "y": [43.99, 37.84, 54.46, 49.64, 41.83, 49.64, 45.15],
         "outcome": ["On Target", "Goal", "Off Target", "Off Target", "Off Target", "On Target", "On Target"],
         # Example video link for the goal
-        "video": [None, "https://www.sample-videos.com/video321/mp4/720/big_buck_bunny_720p_1mb.mp4", None, None, None, None, None]
+        "video": ["videos/Fin 1.mp4", "videos/Fin 2.mp4", "videos/Fin 3.mp4", "videos/Fin 4.mp4", "videos/Fin 5.mp4", "videos/Fin 6.mp4", "videos/Fin 7.mp4"]
     }
     return pd.DataFrame(data)
 
