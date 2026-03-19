@@ -33,10 +33,10 @@ df = pd.DataFrame(shots_raw, columns=["type", "x", "y", "video"])
 
 def get_style(outcome):
     if outcome == "GOAL":
-        return '*', '#EF476F', 180
+        return '*', '#EF476F', 250
     if outcome == "ON TARGET":
-        return 'h', '#06D6A0', 150
-    return 'o', '#FFD166', 130
+        return 'h', '#06D6A0', 200
+    return 'o', '#FFD166', 180
 
 # ==========================
 # Layout
@@ -85,9 +85,9 @@ with col_map:
         handles=legend_elements,
         loc='upper left',
         frameon=True,
-        fontsize=9,
-        facecolor='#1a1a1a',
-        edgecolor='white'
+        fontsize=10,
+        facecolor='white',
+        edgecolor='black'
     )
 
     # Converter imagem para clique
