@@ -106,28 +106,27 @@ with col_map:
     click = streamlit_image_coordinates(img_obj, width=700)
 
 # ==========================
-# Click Logic
+# Click Logic (Corrigida)
 # ==========================
-selected_event = None
-
 if click is not None:
-    real_w, real_h = img_obj.size
+    # 1. Pegar as dimensões da imagem exibida
     disp_w, disp_h = click["width"], click["height"]
+    
+    # 2. Calcular a posição relativa (0 a 1) do clique
+    # O Streamlit Image Coordinates já dá o x e y relativo ao container
+    rel_x = click["x"] / disp_w
+    rel_y = click["y"] / disp_h
 
-    pixel_x = click["x"] * (real_w / disp_w)
-    pixel_y = click["y"] * (real_h / disp_h)
+    # 3. Mapear para os limites do Pitch (Statsbomb: X vai de 0-120, Y de 0-80)
+    # Importante: No Statsbomb, o Y 0 é o topo, então não precisa inverter o Y do clique!
+    field_x = rel_x * 120
+    field_y = rel_y * 80
 
-    mpl_pixel_y = real_h - pixel_y
-    coords = ax.transData.inverted().transform((pixel_x, mpl_pixel_y))
+    # 4. Cálculo de distância euclidiana simples
+    df["dist"] = np.sqrt((df["x"] - field_x)**2 + (df["y"] - field_y)**2)
 
-    field_x, field_y = coords[0], coords[1]
-
-    df["dist"] = np.sqrt(
-    ((df["x"] - field_x) / 1.2)**2 +   # ajuste eixo X
-    ((df["y"] - field_y) / 0.8)**2     # ajuste eixo Y
-)
-
-    RADIUS = 4
+    # Ajuste o RADIUS conforme necessário (ex: 3 a 5 unidades do campo)
+    RADIUS = 3 
     candidates = df[df["dist"] < RADIUS]
 
     if not candidates.empty:
